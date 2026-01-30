@@ -28,12 +28,12 @@
 ## 📚 교육
 
 - 경제학 전공
-- 삼정 KPMG 퓨처 아카데미(진행중)
+- (진행중)삼정 KPMG 퓨처 아카데미[https://blog.naver.com/yoonaheo04]
 
 ## 📞 연락처
 
-- 이메일: [example@email.com](yoona.heo04@gmail.com)
-- GitHub: [github.com/username](https://github.com/imyoonaheo)
-- LinkedIn: [linkedin.com/in/username](www.linkedin.com/in/imyoonaheo)
+- 이메일: [yoona.heo04@gmail.com]
+- GitHub: [https://github.com/imyoonaheo]
+- LinkedIn: [www.linkedin.com/in/imyoonaheo]
 
 함께 일하고 싶으시다면 언제든 연락 주세요!
