@@ -111,4 +111,28 @@ FROM 고객 RIGHT JOIN 주문
 ON 고객.고객번호 = 주문.고객번호
 WHERE 주문.주문수량 IS NULL;
 
+# 예제 5-6
+SELECT 고객번호
+, 고객회사명
+, 담당자명
+, 마일리지
+, 등급명
+FROM 고객 
+INNER JOIN 마일리지등급
+ON 마일리지 >= 하한마일리지
+AND 마일리지 <= 상한마일리지
+WHERE 담당자명 = '이은광';
 
+# 예제 5-9
+SELECT 부서명 
+, 사원.*
+FROM 사원 
+RIGHT OUTER JOIN 부서
+ON 사원.부서번호 = 부서.부서번호
+WHERE 사원.부서번호 IS NULL;
+
+-- 주문 안한 고객
+SELECT 고객.고객회사명, 고객.담당자명
+FROM 고객 LEFT JOIN 주문 
+ON 고객.고객번호 = 주문.고객번호
+WHERE 주문.주문번호 IS NULL;
