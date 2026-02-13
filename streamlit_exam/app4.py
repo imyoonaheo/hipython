@@ -98,6 +98,43 @@ st.markdown(CSS, unsafe_allow_html=True)
 # -----------------------------
 # Utilities
 # -----------------------------
+def rule_based_proba_row(row: pd.Series) -> float:
+    """sklearn 없이도 돌아가는 간단 확률(현재 Prediction의 fallback 로직과 동일 계열)"""
+    proba = 0.15
+    if TENURE_COL and pd.notna(row.get(TENURE_COL)) and float(row[TENURE_COL]) < 12:
+        proba += 0.30
+    if MONTHLY_COL and pd.notna(row.get(MONTHLY_COL)) and float(row[MONTHLY_COL]) > 85:
+        proba += 0.15
+    if CONTRACT_COL and pd.notna(row.get(CONTRACT_COL)) and str(row[CONTRACT_COL]).lower().startswith("month"):
+        proba += 0.12
+    if TECH_COL and pd.notna(row.get(TECH_COL)) and str(row[TECH_COL]).lower() == "no":
+        proba += 0.18
+    if SEC_COL and pd.notna(row.get(SEC_COL)) and str(row[SEC_COL]).lower() == "no":
+        proba += 0.16
+    return float(np.clip(proba, 0.01, 0.95))
+
+
+def score_df_rule(df_in: pd.DataFrame) -> pd.DataFrame:
+    """전체 고객에 churn_proba(확률) 컬럼을 생성(룰 기반이라 100% 동작)"""
+    out = df_in.copy()
+    out["churn_proba"] = out.apply(rule_based_proba_row, axis=1)
+    return out
+
+
+def apply_actions_rule(df_in: pd.DataFrame, actions: list) -> pd.DataFrame:
+    """What-if 액션을 피처에 반영 (룰 기반 시뮬레이션용)"""
+    x = df_in.copy()
+    for a in actions:
+        if a == "TechSupport -> Yes" and TECH_COL and TECH_COL in x.columns:
+            x[TECH_COL] = "Yes"
+        elif a == "OnlineSecurity -> Yes" and SEC_COL and SEC_COL in x.columns:
+            x[SEC_COL] = "Yes"
+        elif a == "Contract -> One year" and CONTRACT_COL and CONTRACT_COL in x.columns:
+            x[CONTRACT_COL] = "One year"
+        elif a == "MonthlyCharges -10%" and MONTHLY_COL and MONTHLY_COL in x.columns:
+            x[MONTHLY_COL] = pd.to_numeric(x[MONTHLY_COL], errors="coerce") * 0.9
+    return x
+
 def _coerce_total_charges(s: pd.Series) -> pd.Series:
     # Common in telco churn data: TotalCharges has blanks/spaces
     return pd.to_numeric(s.astype(str).str.strip().replace({"": np.nan, "nan": np.nan}), errors="coerce")
@@ -270,86 +307,175 @@ with nav_cols[2]:
     if st.button("🤖 Prediction", use_container_width=True):
         st.session_state.page = "Prediction"
 with nav_cols[3]:
-    if st.button("📌 Strategy", use_container_width=True):
-        st.session_state.page = "Strategy"
+    if st.button("📌 Simulator", use_container_width=True):
+        st.session_state.page = "Simulator"
 
 st.write("")
 
-# -----------------------------
-# KPIs (always visible)
-# -----------------------------
-k1, k2, k3, k4 = st.columns(4)
-
-total_customers = len(df)
-cr = churn_rate(df)
-avg_monthly = df[MONTHLY_COL].mean() if MONTHLY_COL else np.nan
-estimated_loss = df.loc[df["Churn"].astype(str).str.lower().eq("yes"), TOTAL_COL].sum() if TOTAL_COL else np.nan
-
-with k1:
-    kpi_card("전체 고객 수", f"{total_customers:,}")
-with k2:
-    kpi_card("이탈률 (Churn Rate)", fmt_pct(cr))
-with k3:
-    kpi_card("평균 월 요금", fmt_money(avg_monthly))
-with k4:
-    kpi_card("추정 매출 손실 (TotalCharges 합)", fmt_money(estimated_loss))
-
-st.write("")
 
 # -----------------------------
 # Pages
 # -----------------------------
 if st.session_state.page == "Overview":
-    left, right = st.columns([1.2, 1.0], gap="large")
+
+    # -----------------------------
+    # 0) 룰 기반 스코어 (항상 동작)
+    # -----------------------------
+    def _rule_proba_row(row: pd.Series) -> float:
+        proba = 0.15
+        if TENURE_COL and pd.notna(row.get(TENURE_COL)) and float(row[TENURE_COL]) < 12:
+            proba += 0.30
+        if MONTHLY_COL and pd.notna(row.get(MONTHLY_COL)) and float(row[MONTHLY_COL]) > 85:
+            proba += 0.15
+        if CONTRACT_COL and pd.notna(row.get(CONTRACT_COL)) and str(row[CONTRACT_COL]).lower().startswith("month"):
+            proba += 0.12
+        if TECH_COL and pd.notna(row.get(TECH_COL)) and str(row[TECH_COL]).lower() == "no":
+            proba += 0.18
+        if SEC_COL and pd.notna(row.get(SEC_COL)) and str(row[SEC_COL]).lower() == "no":
+            proba += 0.16
+        return float(np.clip(proba, 0.01, 0.95))
+
+    df_over = df.copy()
+    df_over["churn_proba"] = df_over.apply(_rule_proba_row, axis=1)
+
+    # -----------------------------
+    # 1) KPI (기준 고정 0.70)
+    # -----------------------------
+    risk_cut = 0.70
+
+    total_customers = len(df_over)
+    cr = churn_rate(df_over)
+
+    high_risk = df_over[df_over["churn_proba"] >= risk_cut]
+    high_risk_n = len(high_risk)
+
+    has_value = bool(TOTAL_COL and TOTAL_COL in df_over.columns)
+    top_value_risk_n = np.nan
+    at_risk_revenue = np.nan
+
+    if has_value:
+        df_over[TOTAL_COL] = pd.to_numeric(df_over[TOTAL_COL], errors="coerce")
+        tmp = df_over.dropna(subset=[TOTAL_COL]).copy()
+        if len(tmp) > 10:
+            tmp["value_q"] = pd.qcut(tmp[TOTAL_COL], 4, labels=["Low","Mid","High","Top"])
+            top_value_risk = tmp[(tmp["value_q"].astype(str)=="Top") & (tmp["churn_proba"]>=risk_cut)]
+            top_value_risk_n = len(top_value_risk)
+            at_risk_revenue = top_value_risk[TOTAL_COL].sum()
+
+    st.subheader("Overview")
+    st.caption("High Risk 기준: 0.70 (고정)")
+
+    k1,k2,k3,k4,k5 = st.columns(5)
+    with k1: kpi_card("전체 고객 수", f"{total_customers:,}")
+    with k2: kpi_card("전체 이탈률", fmt_pct(cr))
+    with k3: kpi_card("High Risk 고객 수", f"{high_risk_n:,}")
+    with k4:
+        if has_value:
+            kpi_card("Top Value & High Risk", f"{int(top_value_risk_n):,}")
+        else:
+            kpi_card("Top Value & High Risk", "—")
+    with k5:
+        if has_value:
+            kpi_card("At-risk 매출(합)", fmt_money(at_risk_revenue))
+        else:
+            kpi_card("At-risk 매출(합)", "—")
+
+    st.write("")
+
+    # -----------------------------
+    # 2) Driver Gap 3개
+    # -----------------------------
+    def _gap_rate(df_in, cond_a, cond_b):
+        if "Churn" not in df_in.columns:
+            return np.nan
+        a = df_in.loc[cond_a,"Churn"].astype(str).str.lower().eq("yes").mean()*100
+        b = df_in.loc[cond_b,"Churn"].astype(str).str.lower().eq("yes").mean()*100
+        return float(a-b)
+
+    d1,d2,d3 = st.columns(3)
+
+    with d1:
+        st.markdown("#### 계약 형태")
+        if CONTRACT_COL:
+            s = df_over[CONTRACT_COL].astype(str)
+            gap = _gap_rate(df_over, s.str.lower().str.startswith("month"), ~s.str.lower().str.startswith("month"))
+            st.metric("월단위 - 장기 갭", f"{gap:.1f}%p")
+        else:
+            st.write("데이터 부족")
     
 
+    with d2:
+        st.markdown("#### 문제 해결 경험")
+        feat = TECH_COL if TECH_COL else SEC_COL
+        if feat:
+            s = df_over[feat].astype(str).str.lower()
+            gap = _gap_rate(df_over, s.eq("no"), s.eq("yes"))
+            st.metric("미이용 - 이용 갭", f"{gap:.1f}%p")
+        else:
+            st.write("데이터 부족")
+
+    with d3:
+        st.markdown("#### 가입 초기")
+        if TENURE_COL:
+            t = pd.to_numeric(df_over[TENURE_COL], errors="coerce")
+            gap = _gap_rate(df_over, t<12, t>=12)
+            st.metric("초기<12 - 그 외 갭", f"{gap:.1f}%p")
+        else:
+            st.write("데이터 부족")
+
+    st.write("")
+
+    # -----------------------------
+    # 3) 분포 + Top 10
+    # -----------------------------
+    left,mid,right = st.columns([1,1,1.2], gap="large")
 
     with left:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.subheader("Project Overview")
-        st.write(
-            "이 프로젝트는 통신사 고객 이탈(Churn)을 단순 예측 문제가 아니라 "
-            "‘경험 누적의 결과’로 보고, 요금·가입기간·서비스 경험·고객가치 관점에서 구조적으로 해석합니다."
-        )
-        st.markdown(
-            """
-            <div class="notice">
-              <b>분석 질문</b><br/>
-              Q1) 요금 수준은 이탈과 어떤 관계가 있는가?<br/>
-              Q2) 가입기간(tenure)은 이탈과 어떤 관계가 있는가?<br/>
-              Q3) 서비스 이용 경험(지원/보안 등)은 이탈에 어떤 영향을 미치는가?<br/>
-              Q4) 이탈 고객 중에서도 반드시 유지해야 할 고객은 누구인가?
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.write("")
-        st.subheader("Data Preview")
-        st.dataframe(df.head(12), use_container_width=True, height=340)
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.subheader("Risk 분포")
+        bins = pd.cut(df_over["churn_proba"],
+                      bins=[0,0.4,0.7,1.0],
+                      labels=["Low","Mid","High"],
+                      include_lowest=True)
+        dist = bins.value_counts().reindex(["Low","Mid","High"]).fillna(0)
+
+        fig,ax = plt.subplots()
+        ax.bar(dist.index.astype(str), dist.values, color="#9BA986")
+        apply_light_style(ax,"Risk Bucket")
+        st.pyplot(fig, clear_figure=True)
+
+    with mid:
+        st.subheader("가입기간별 이탈률")
+        if TENURE_COL:
+            tmp = df_over[[TENURE_COL,"Churn"]].dropna()
+            tmp[TENURE_COL]=pd.to_numeric(tmp[TENURE_COL],errors="coerce")
+            tmp["tenure_bin"]=pd.cut(tmp[TENURE_COL],
+                                     bins=[-1,6,12,24,48,72,999],
+                                     labels=["0-6","7-12","13-24","25-48","49-72","72+"])
+            tmp["is_churn"]=tmp["Churn"].astype(str).str.lower().eq("yes").astype(int)
+            rate = tmp.groupby("tenure_bin",observed=True)["is_churn"].mean()*100
+
+            fig,ax = plt.subplots()
+            ax.plot(rate.index.astype(str),rate.values,marker="o",color="#9BA986")
+            apply_light_style(ax,"Churn by Tenure")
+            st.pyplot(fig,clear_figure=True)
+        else:
+            st.write("데이터 부족")
 
     with right:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.subheader("이탈 분포 (Target Distribution)")
-        if "Churn" in df.columns:
-            counts = df["Churn"].astype(str).str.title().value_counts()
-            fig = plt.figure()
-            fig, ax = plt.subplots(figsize=(4, 3))
-            plt.bar(counts.index, counts.values, color='#9BA986', width=0.6)
-            plt.title("Churn Distribution")
-            plt.xlabel("Churn")
-            plt.ylabel("Count")
-            st.pyplot(fig, clear_figure=True)
-            st.markdown(
-                f"<div class='small-muted'>현재 이탈 고객 비중은 <b>{fmt_pct(cr)}</b> 입니다.</div>",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.info("Churn 컬럼이 없어 분포를 그릴 수 없습니다.")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.subheader("우선 타겟 Top 10")
+        top = df_over.sort_values("churn_proba",ascending=False).head(10)
+        cols=[]
+        for c in ["customerID",TENURE_COL,MONTHLY_COL,CONTRACT_COL,TECH_COL,SEC_COL,TOTAL_COL,"churn_proba","Churn"]:
+            if c and c in top.columns and c not in cols:
+                cols.append(c)
+        st.dataframe(top[cols] if cols else top,
+                     use_container_width=True,
+                     height=350)
+
+    
 
 elif st.session_state.page == "EDA":
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
+
     st.subheader("EDA (Q1~Q4 상세 분석)")
     tabs = st.tabs(["Q1 요금", "Q2 가입기간", "Q3 서비스경험", "Q4 고객가치"])
 
@@ -459,10 +585,8 @@ elif st.session_state.page == "EDA":
         else:
             st.info("데이터가 부족합니다.")
 
-    st.markdown("</div>", unsafe_allow_html=True)
 
 elif st.session_state.page == "Prediction":
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.subheader("Churn Prediction (입력 → 예측)")
     st.markdown(
         "<div class='small-muted'>간단 모델(가능 시 Logistic Regression) 또는 룰 기반으로 ‘이탈 가능성’을 추정합니다.</div>",
@@ -489,7 +613,6 @@ elif st.session_state.page == "Prediction":
 
     if not feature_cols or "Churn" not in df.columns:
         st.info("예측에 필요한 컬럼(Churn 및 주요 피처)이 부족합니다.")
-        st.markdown("</div>", unsafe_allow_html=True)
     else:
         # Input form
         left, right = st.columns([1.0, 1.2], gap="large")
@@ -612,63 +735,125 @@ elif st.session_state.page == "Prediction":
                 else:
                     st.markdown("**가능한 원인(설명용):** 입력 정보 기준으로 뚜렷한 위험 요인이 적습니다.")
 
-    st.markdown("</div>", unsafe_allow_html=True)
 
-elif st.session_state.page == "Strategy":
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("Business Strategy (분석 결과 → 실행 제안)")
-    st.write("")
+elif st.session_state.page == "Simulator":
 
-    c1, c2, c3 = st.columns(3, gap="large")
-
-    with c1:
-        st.markdown("#### 핵심 인사이트 1")
-        st.write("이탈은 ‘장기 사용 중 갑자기’보다 **가입 초기 경험(온보딩/첫 문제 해결)**에서 크게 갈립니다.")
-
-    with c2:
-        st.markdown("#### 핵심 인사이트 2")
-        st.write("지원/보안 등 **문제 해결 경험(TechSupport/OnlineSecurity)**이 없을 때 이탈이 급증하는 패턴이 나타납니다.")
-
-    with c3:
-        st.markdown("#### 핵심 인사이트 3")
-        st.write("이탈률만 보면 ‘낮은 가치 고객’이 많지만, **고가치 고객의 이탈은 손실이 비대칭**적으로 큽니다.")
-
-    st.write("")
-    st.markdown("#### 전략 매핑 (Insight → Action → KPI)")
-    strategy_rows = [
-        {
-            "Insight": "가입 초기(0~12개월) 이탈 집중",
-            "Action": "초기 30일 온보딩(가이드+체크인), 첫 달 문제 해결 SLA 강화",
-            "KPI": "D30 잔존율, 초기 CS 해결률, 첫 달 불만 접수율",
-        },
-        {
-            "Insight": "지원/보안 서비스 미이용 고객의 이탈 위험",
-            "Action": "TechSupport/OnlineSecurity ‘체험 활성화’ 캠페인 + 번들 구성",
-            "KPI": "서비스 활성화율, 서비스 미이용군 이탈률",
-        },
-        {
-            "Insight": "고가치 고객 이탈은 손실이 큼",
-            "Action": "고가치·고위험 세그먼트에 전담 유지(혜택/우선 상담/맞춤 요금제)",
-            "KPI": "고가치 고객 이탈률, 유지 캠페인 ROI, ARPU 유지",
-        },
-    ]
-    st.dataframe(pd.DataFrame(strategy_rows), use_container_width=True)
-
-    st.write("")
-    st.markdown("#### 우선순위 플레이북(권장 세그먼트)")
-    st.write(
-        "1) **고가치 & 고위험**: tenure 낮고(또는 최근 문제), 지원/보안 미이용 → 즉시 케어\n\n"
-        "2) **중가치 & 고위험**: Month-to-month + 서비스 미이용 → 서비스 경험 제공이 핵심\n\n"
-        "3) **고가치 & 저위험**: 이탈률은 낮지만 ‘불만 발생 시’ 빠른 해결로 방어"
+    st.subheader("Strategy Simulator (간단 시뮬레이션)")
+    st.markdown(
+        "<div class='small-muted'>세그먼트(누구에게) + 액션(무엇을) + 기대효과(얼마나)를 간단 룰로 계산합니다.</div>",
+        unsafe_allow_html=True,
     )
+    st.write("")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    # 1) 룰 기반으로 전체 스코어 생성 (항상 동작)
+    df_scored = score_df_rule(df)
 
-# -----------------------------
-# Footer note
-# -----------------------------
-st.write("")
-st.markdown(
-    "<div class='small-muted'>데이터 파일이 없으면 앱이 데모 데이터로 실행됩니다. 실제 데이터는 <code>data/telco_churn.csv</code> 경로에 두면 자동 로드됩니다.</div>",
-    unsafe_allow_html=True,
+    # 2) 세그먼트 만들기: Risk(확률) / Value(총매출) 있으면 같이, 없으면 Risk만
+    if TOTAL_COL and TOTAL_COL in df_scored.columns:
+        base = df_scored.dropna(subset=[TOTAL_COL]).copy()
+        base[TOTAL_COL] = pd.to_numeric(base[TOTAL_COL], errors="coerce")
+        base = base.dropna(subset=[TOTAL_COL])
+
+        # 분위수로 간단 구간
+        base["risk_q"] = pd.qcut(base["churn_proba"], 4, labels=["Low", "Mid", "High", "Top"])
+        base["value_q"] = pd.qcut(base[TOTAL_COL], 4, labels=["Low", "Mid", "High", "Top"])
+        base["segment"] = base["value_q"].astype(str) + " / " + base["risk_q"].astype(str)
+    else:
+        base = df_scored.copy()
+        base["risk_q"] = pd.qcut(base["churn_proba"], 4, labels=["Low", "Mid", "High", "Top"])
+        base["segment"] = "RiskOnly / " + base["risk_q"].astype(str)
+
+    left, right = st.columns([0.9, 1.1], gap="large")
+
+    with left:
+        st.markdown("#### 1) 타겟 세그먼트")
+        seg_options = base["segment"].value_counts().index.tolist()
+        seg = st.selectbox("세그먼트 선택", options=seg_options, index=0)
+
+        pool = base[base["segment"] == seg].sort_values("churn_proba", ascending=False).copy()
+
+        st.markdown("#### 2) 타겟팅 강도")
+        treat_ratio = st.slider("상위 위험 고객 중 몇 %를 대상으로 할까요?", 0.05, 1.00, 0.30, 0.05)
+        k = max(1, int(len(pool) * treat_ratio))
+        target = pool.head(k).copy()
+
+        st.markdown("#### 3) 액션(What-if)")
+        action_choices = []
+        st.caption(
+"※ 캠페인은 고객 이탈을 방지하기 위한 유지 전략입니다. "
+"예: TechSupport 제공, 장기 계약 전환, 요금 할인 등"
 )
+        if TECH_COL: action_choices.append("TechSupport -> Yes")
+        if SEC_COL: action_choices.append("OnlineSecurity -> Yes")
+        if CONTRACT_COL: action_choices.append("Contract -> One year")
+        if MONTHLY_COL: action_choices.append("MonthlyCharges -10%")
+
+        actions = st.multiselect("적용할 액션(가정)", options=action_choices, default=action_choices[:1] if action_choices else [])
+
+        st.markdown("#### 4) 비용/가치(ROI)")
+        st.caption(
+"ROI = (기대 매출 방어 - 총 캠페인 비용) / 총 캠페인 비용"
+)
+        value_per_saved = st.number_input("이탈 1건 방어 가치(원)", min_value=0, value=150000, step=10000)
+        cost_per_target = st.number_input("타겟 1명당 캠페인 비용(원)", min_value=0, value=5000, step=500)
+
+        st.write("---")
+        st.write(f"- 후보 고객 수: **{len(pool):,}**")
+        st.write(f"- 실제 타겟 수: **{len(target):,}**")
+
+    with right:
+        st.markdown("#### 결과(기대값)")
+        if len(target) == 0:
+            st.info("타겟이 없습니다.")
+        else:
+            # Before
+            before = target.copy()
+
+            # After: 액션 적용 → 다시 스코어
+            after_features = apply_actions_rule(target, actions)
+            after = score_df_rule(after_features)
+
+            expected_before = float(before["churn_proba"].clip(0, 1).sum())
+            expected_after = float(after["churn_proba"].clip(0, 1).sum())
+            expected_saved = float((before["churn_proba"] - after["churn_proba"]).clip(0, 1).sum())
+
+            revenue_saved = expected_saved * float(value_per_saved)
+            total_cost = float(cost_per_target) * len(target)
+            roi = (revenue_saved - total_cost) / total_cost if total_cost > 0 else np.nan
+
+            m1, m2, m3, m4 = st.columns(4)
+            with m1:
+                st.metric("기대 이탈(전)", f"{expected_before:.1f} 건")
+            with m2:
+                st.metric("기대 이탈(후)", f"{expected_after:.1f} 건", delta=f"{(expected_after-expected_before):.1f} 건")
+            with m3:
+                st.metric("기대 방어 이탈", f"{expected_saved:.1f} 건")
+            with m4:
+                st.metric("기대 매출 방어", f"{revenue_saved:,.0f} 원")
+
+            st.write("---")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.metric("총 캠페인 비용", f"{total_cost:,.0f} 원")
+            with c2:
+                st.metric("순효과(매출-비용)", f"{(revenue_saved-total_cost):,.0f} 원")
+            with c3:
+                st.metric("ROI", "—" if pd.isna(roi) else f"{roi*100:.1f}%")
+
+            st.write("---")
+            st.markdown("#### 타겟 리스트(상위 위험도 30명)")
+            show_cols = []
+            for c in ["customerID", "CustomerID", TENURE_COL, MONTHLY_COL, CONTRACT_COL, TECH_COL, SEC_COL, TOTAL_COL, "churn_proba", "Churn"]:
+                if c and c in before.columns and c not in show_cols:
+                    show_cols.append(c)
+
+            if show_cols:
+                st.dataframe(before[show_cols].head(30), use_container_width=True, height=360)
+            else:
+                st.dataframe(before.head(30), use_container_width=True, height=360)
+
+            st.markdown(
+                "<div class='small-muted'>주의: 룰 기반 기대값(확률 합) 시뮬레이션입니다. 실제 운영에서는 A/B 테스트로 효과(uplift)를 검증합니다.</div>",
+                unsafe_allow_html=True,
+            )
+
