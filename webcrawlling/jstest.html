@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>이름 입력 예제</title>
+</head>
+<body>
+
+<h3>이름</h3>
+
+<input type="text" id="nameInput" placeholder="이름을 입력하세요">
+<button onclick="showName()">입력</button>
+
+<p>당신의 이름은 <span id="result">_____</span> 입니다.</p>
+
+<script>
+function showName() {
+    // 1. 입력값 가져오기
+    const name = document.getElementById("nameInput").value;
+
+    // 2. 결과 영역에 넣기
+    document.getElementById("result").textContent = name;
+}
+</script>
+
+</body>
+</html>
