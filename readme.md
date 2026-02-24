@@ -1,39 +1,45 @@
-# 포트폴리오
-저는 현재 **삼정 KPMG 퓨처 아카데미**에서
-컨설팅 실무 관점의 문제 정의, 구조화, 데이터·AI 활용 방식을 학습하고 있습니다.
+# Portfolio
+I am building consulting-oriented projects through the Samjong KPMG Future Academy, focusing on structured problem definition and data-driven decision support.
 
-기술이나 아이디어 자체보다
-의사결정에 도움이 되는 정리와 논리에 집중합니다.
+Rather than emphasizing tools alone, I focus on translating data and AI capabilities into practical business implications.
 
-## 🎯 About Me
-- 삼정 KPMG 퓨처 아카데미 기반 컨설팅 문제 해결 프레임 학습
-- 산업 이슈를 비즈니스 문제로 재정의하는 연습
-- 데이터·AI를 “도입 목적”이 아닌 활용 효과 관점에서 접근
-- 팀 프로젝트 중심의 구조화·발표·피드백 경험
+# 🎯 Focus Areas
 
-## 💻 기술 스택
+- Structuring ambiguous business issues into clear problem statements
+- Applying consulting-style frameworks to industry and process analysis
+- Evaluating AI applications based on measurable business impact
+- Developing actionable recommendations supported by logical reasoning
 
-- Frontend: 
-- Database: MySQL
-- Version Control: Git, GitHub
+# 🚀 Project Experience
 
-## 🚀 프로젝트
+## Business Process Improvement & AI Application
+- Analyzed existing workflow structures and identified operational pain points
+- Defined data-utilization opportunities within current processes
+- Compared expected impact vs. implementation risks of AI adoption
+- Designed short-term PoC and long-term scalability roadmap
 
-- 업무 프로세스 개선 / AI 활용 과제
-  - 기존 업무 흐름 분석 및 Pain Point 도출
-  - 데이터 활용 가능 구간 정의
-  - AI 적용 시 효과 vs 리스크 비교
-  - 단기 PoC와 중장기 확장 시나리오 구분
+Each project emphasizes:
+1. Problem Definition
+2. Analytical Approach
+3. Key Findings
+4. Business Implications
 
-## 📚 교육
+# 🛠 Technical Toolkit
 
-- 경제학 전공
-- (진행중)삼정 KPMG 퓨처 아카데미[https://blog.naver.com/yoonaheo04]
+- Python (Pandas, Seaborn, Matplotlib)
+- MySQL
+- Jupyter Notebook
+- Git & GitHub
 
-## 📞 연락처
+Tools are used to support structured analysis and decision-making processes.
 
-- 이메일: [yoona.heo04@gmail.com]
+# 🎓 Background
+
+B.A. in Economics @UMass Amherst
+AI Business Consulting Trainee, Samjong KPMG Future Academy (K-Digital Training Program)
+
+# 📫 Contact
+
+- Email: yoona.heo04@gmail.com
+- LinkedIn: [https://www.linkedin.com/in/imyoonaheo/]
 - GitHub: [https://github.com/imyoonaheo]
-- LinkedIn: [www.linkedin.com/in/imyoonaheo]
-
-함께 일하고 싶으시다면 언제든 연락 주세요!
