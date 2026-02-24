@@ -35,8 +35,8 @@ Tools are used to support structured analysis and decision-making processes.
 
 # 🎓 Background
 
-B.A. in Economics @UMass Amherst
-AI Business Consulting Trainee, Samjong KPMG Future Academy (K-Digital Training Program)
+- B.A. in Economics @UMass Amherst
+- AI Business Consulting Trainee, Samjong KPMG Future Academy (K-Digital Training Program)
 
 # 📫 Contact
 
