@@ -23,8 +23,6 @@ media/
 esg_data_test.json 
 
 #data
-data/
-data/okm_augumented_2021.csv   ← 용량 클 수 있음
-data/한전전기료.xlsx             ← 민감 데이터
+data/      
 __pycache__/
 .streamlit/
