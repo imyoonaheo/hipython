@@ -4,7 +4,12 @@ import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import warnings
+import os
 warnings.filterwarnings('ignore')
+
+# 파일 경로 (로컬/클라우드 모두 호환)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
 
 # ─────────────────────────────────────────
 # 페이지 설정

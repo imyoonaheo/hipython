@@ -23,6 +23,8 @@ media/
 esg_data_test.json 
 
 #data
-data/      
+data/
+!data/okm_augumented_2021.csv
+!data/한전전기료.xlsx
 __pycache__/
 .streamlit/
