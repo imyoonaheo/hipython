@@ -109,7 +109,7 @@ st.markdown("""
 # ─────────────────────────────────────────
 @st.cache_data
 def load_data():
-    df = pd.read_csv('data/okm_augumented_2021.csv', encoding='utf-8-sig')
+    df = pd.read_csv(os.path.join(DATA_DIR, 'okm_augumented_2021.csv'), encoding='utf-8-sig')
 
     # 시간 이상값 제거 (0~23 범위만 유효)
     df = df[df['시간'].between(0, 23)].copy()
