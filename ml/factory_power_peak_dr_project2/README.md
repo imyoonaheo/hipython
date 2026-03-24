@@ -196,8 +196,6 @@ factory_power_peak_dr_project2/
 
 ![WBS1](assets/slide_29_wbs1.png)
 
-![WBS2](assets/slide_30_wbs2.png)
-
 ---
 
 ## 12. 팀원 소개
