@@ -28,3 +28,6 @@ data/
 !data/한전전기료.xlsx
 __pycache__/
 .streamlit/
+
+#energy_app
+ml/energy_app/
