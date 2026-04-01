@@ -31,3 +31,8 @@ __pycache__/
 
 #energy_app
 ml/energy_app/
+
+*.png
+*.jpg
+*.jpeg
+*.txt
