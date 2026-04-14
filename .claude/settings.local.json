@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gemini -p \"You are participating in a structured debate. Debate topic: '파이썬에서 리스트\\(list\\)와 튜플\\(tuple\\) 중 실용적으로 어느 것이 더 좋은가?' Take a clear position \\(either list or tuple\\) and give 3 strong practical arguments for your position. Respond in Korean. Keep it under 200 words. Format: Position statement, then 3 numbered arguments.\")",
+      "Bash(codex --approval-mode full-auto -q \"Debate topic: 파이썬에서 리스트\\(list\\)와 튜플\\(tuple\\) 중 실용적으로 어느 것이 더 좋은가? Take a clear position and give 3 practical arguments in Korean. Under 150 words.\")",
+      "Bash(codex --help)",
+      "Bash(gemini -p \"리스트 vs 튜플 중 실용적으로 어느 것이 더 좋은가? 짧게 입장과 3가지 이유를 한국어로.\")"
+    ]
+  }
+}
